@@ -6,7 +6,7 @@ export const Editor: React.FC = () => {
   const { text, setText, setIsPlaying, saveToHistory } = useAppContext();
 
   return (
-    <div className="editor-container glass" style={{ margin: 'auto', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', maxWidth: '800px' }}>
+    <div className="editor-container glass" style={{ borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', maxWidth: '800px' }}>
       <h2 style={{ fontSize: '1.5rem', fontWeight: 600 }}>Add Your Story</h2>
       <textarea
         className="editor-textarea"

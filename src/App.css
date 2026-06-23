@@ -60,6 +60,7 @@
   display: flex;
   position: relative;
   overflow: hidden;
+  padding: 1rem;
 }
 
 .editor-container {
@@ -336,10 +337,14 @@ input:checked + .slider:before {
     padding: 0.75rem 1rem;
   }
   
+  .main-content {
+    padding: 0.5rem;
+  }
+
   .editor-container {
     padding: 1rem;
-    margin: 1rem;
-    width: auto;
+    margin: 0 auto;
+    width: 100%;
   }
   
   .settings-panel, .history-panel {
