@@ -27,7 +27,9 @@ export const Teleprompter: React.FC = () => {
   const lastTouchY = useRef<number | null>(null);
 
   // Recording state
-  const [isRecording, setIsRecording] = useState(false);
+  const [recordingState, setRecordingState] = useState<'inactive' | 'recording' | 'paused'>('inactive');
+  const [pendingAudioUrl, setPendingAudioUrl] = useState<string | null>(null);
+  const [audioTitle, setAudioTitle] = useState('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -40,45 +42,67 @@ export const Teleprompter: React.FC = () => {
     };
   }, []);
 
-  const handleToggleRecording = async () => {
-    if (isRecording) {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-      }
-      setIsRecording(false);
-    } else {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-        audioChunksRef.current = [];
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
 
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) {
-            audioChunksRef.current.push(e.data);
-          }
-        };
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
 
-        mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const link = document.createElement('a');
-          link.href = audioUrl;
-          link.download = `storyverse-recording-${Date.now()}.webm`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-          // Stop all tracks to release microphone
-          stream.getTracks().forEach(track => track.stop());
-        };
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        setPendingAudioUrl(audioUrl);
+        
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+      };
 
-        mediaRecorder.start();
-        setIsRecording(true);
-      } catch (err) {
-        console.error("Error accessing microphone:", err);
-        setError("Could not access microphone for recording. Please check permissions.");
-      }
+      mediaRecorder.start();
+      setRecordingState('recording');
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      setError("Could not access microphone for recording. Please check permissions.");
+    }
+  };
+
+  const pauseRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.pause();
+      setRecordingState('paused');
+    }
+  };
+
+  const resumeRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
+      mediaRecorderRef.current.resume();
+      setRecordingState('recording');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      setRecordingState('inactive');
+    }
+  };
+
+  const saveRecording = () => {
+    if (pendingAudioUrl) {
+      const link = document.createElement('a');
+      link.href = pendingAudioUrl;
+      link.download = `${audioTitle.trim() || 'storyverse-recording'}.webm`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setPendingAudioUrl(null);
+      setAudioTitle('');
     }
   };
 
@@ -365,14 +389,34 @@ export const Teleprompter: React.FC = () => {
       </div>
 
       <div className="teleprompter-overlay-controls glass">
-        <button 
-          className="icon-btn"
-          onClick={handleToggleRecording}
-          title={isRecording ? "Stop & Save Recording" : "Start Voice Recording"}
-          style={isRecording ? { color: '#ef4444', borderColor: '#ef4444', animation: 'pulse 2s infinite' } : {}}
-        >
-          {isRecording ? <Square size={20} fill="currentColor" /> : <Mic size={20} />}
-        </button>
+        {recordingState === 'inactive' ? (
+          <button 
+            className="icon-btn"
+            onClick={startRecording}
+            title="Start Voice Recording"
+          >
+            <Mic size={20} />
+          </button>
+        ) : (
+          <>
+            <button 
+              className="icon-btn"
+              onClick={recordingState === 'recording' ? pauseRecording : resumeRecording}
+              title={recordingState === 'recording' ? "Pause Recording" : "Resume Recording"}
+              style={{ color: '#eab308', borderColor: '#eab308' }}
+            >
+              {recordingState === 'recording' ? <Pause size={20} /> : <Play size={20} />}
+            </button>
+            <button 
+              className="icon-btn"
+              onClick={stopRecording}
+              title="Stop & Save Recording"
+              style={{ color: '#ef4444', borderColor: '#ef4444', animation: recordingState === 'recording' ? 'pulse 2s infinite' : 'none' }}
+            >
+              <Square size={20} fill="currentColor" />
+            </button>
+          </>
+        )}
         <button 
           className="icon-btn" 
           onClick={() => {
@@ -410,6 +454,44 @@ export const Teleprompter: React.FC = () => {
           <X size={20} />
         </button>
       </div>
+
+      {pendingAudioUrl && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          zIndex: 200,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div className="glass" style={{ padding: '2rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '300px' }}>
+            <h3 style={{ margin: 0 }}>Save Recording</h3>
+            <input 
+              type="text" 
+              placeholder="Recording Title..." 
+              value={audioTitle}
+              onChange={(e) => setAudioTitle(e.target.value)}
+              style={{ padding: '0.75rem', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', color: 'white', fontSize: '1.1rem' }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button 
+                onClick={() => { setPendingAudioUrl(null); setAudioTitle(''); }}
+                style={{ padding: '0.5rem 1rem', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1rem' }}
+              >
+                Discard
+              </button>
+              <button 
+                onClick={saveRecording}
+                style={{ padding: '0.5rem 1rem', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '1rem' }}
+              >
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
