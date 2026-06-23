@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
-import { Mic, Square, Play, Pause, X } from 'lucide-react';
+import { Mic, Square, Play, Pause } from 'lucide-react';
 
 export const RecorderScreen: React.FC = () => {
-  const { setAppMode } = useAppContext();
   const [error, setError] = useState<string | null>(null);
 
   const {

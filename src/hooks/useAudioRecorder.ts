@@ -12,7 +12,7 @@ export const useAudioRecorder = (onError?: (err: string) => void) => {
   const isRecordingIntentRef = useRef(false);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (recordingState === 'recording') {
       interval = setInterval(() => {
         setRecordingTime(prev => prev + 1);
