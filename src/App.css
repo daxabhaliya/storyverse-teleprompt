@@ -1,0 +1,326 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: relative;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  z-index: 10;
+}
+
+.header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(to right, var(--accent), #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.icon-btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.icon-btn:hover {
+  background: var(--bg-secondary);
+  transform: translateY(-2px);
+}
+
+.icon-btn.active:hover {
+  background: var(--accent-hover);
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+.editor-container {
+  flex: 1;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.editor-textarea {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  background: transparent;
+  color: var(--text-primary);
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1.6;
+}
+
+.editor-textarea:focus {
+  outline: none;
+}
+
+.bottom-bar {
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  z-index: 10;
+}
+
+.play-btn {
+  background: var(--accent);
+  color: white;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+  transition: all 0.2s;
+}
+
+.play-btn:hover {
+  transform: scale(1.05);
+  background: var(--accent-hover);
+}
+
+/* Settings Panel */
+.settings-panel {
+  position: absolute;
+  top: 0;
+  right: -400px;
+  width: 350px;
+  height: 100%;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 2rem;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  border-left: 1px solid var(--glass-border);
+}
+
+.settings-panel.open {
+  right: 0;
+}
+
+/* History Panel */
+.history-panel {
+  position: absolute;
+  top: 0;
+  left: -400px;
+  width: 350px;
+  height: 100%;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 2rem;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  border-right: 1px solid var(--glass-border);
+}
+
+.history-panel.open {
+  left: 0;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.settings-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-group label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+}
+
+.settings-group input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.settings-group select {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  padding: 0.5rem;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+}
+
+.toggle-label {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* Switch Toggle */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  transition: .4s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--text-secondary);
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+  background-color: white;
+}
+
+/* Teleprompter view */
+.teleprompter-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-primary);
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.teleprompter-scroll-container {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  /* Hide scrollbar for teleprompter */
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.teleprompter-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+.teleprompter-content-wrapper {
+  width: 80%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50vh 0; /* padding to allow scrolling from bottom to top */
+  position: relative;
+}
+
+.teleprompter-text {
+  white-space: pre-wrap;
+  transition: font-size 0.2s, color 0.2s;
+  line-height: 1.5;
+}
+
+.teleprompter-text.mirror {
+  transform: scaleX(-1);
+}
+
+.teleprompter-overlay-controls {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1rem;
+  z-index: 10;
+  padding: 0.5rem;
+  border-radius: 40px;
+}
+
+/* Progress Line Indicator for Voice Tracking / center reading */
+.reading-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, transparent, var(--accent), transparent);
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0.5;
+}
