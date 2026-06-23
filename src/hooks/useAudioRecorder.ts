@@ -22,6 +22,9 @@ export const useAudioRecorder = (onError?: (err: string) => void) => {
     }
     return () => {
       if (interval) clearInterval(interval);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
     };
   }, [recordingState]);
 

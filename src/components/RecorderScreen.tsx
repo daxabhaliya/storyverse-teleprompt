@@ -41,20 +41,7 @@ export const RecorderScreen: React.FC = () => {
       padding: '2rem',
       position: 'relative'
     }}>
-      <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
-        <button
-          className="icon-btn"
-          onClick={() => {
-            if (recordingState !== 'inactive') {
-              stopRecording();
-            }
-            setAppMode('landing');
-          }}
-          title="Exit Recording"
-        >
-          <X size={24} />
-        </button>
-      </div>
+      {/* Removed absolute X button */}
 
       <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem', background: 'linear-gradient(to right, #ef4444, #f87171)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>

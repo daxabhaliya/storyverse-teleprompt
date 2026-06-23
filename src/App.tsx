@@ -18,33 +18,45 @@ function MainApp() {
     <div className="app-container">
       <header className="header glass">
         <h1 
-          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }} 
+          style={{ cursor: 'pointer' }} 
           onClick={() => setAppMode('landing')}
         >
-          {appMode !== 'landing' && <Home size={20} />}
           StoryVerse Teleprompter
         </h1>
         <div className="header-actions">
-          <button 
-            className={`icon-btn ${historyOpen ? 'active' : ''}`}
-            onClick={() => {
-              setHistoryOpen(!historyOpen);
-              if (settingsOpen) setSettingsOpen(false);
-            }}
-            title="History"
-          >
-            <History size={20} />
-          </button>
-          <button 
-            className={`icon-btn ${settingsOpen ? 'active' : ''}`}
-            onClick={() => {
-              setSettingsOpen(!settingsOpen);
-              if (historyOpen) setHistoryOpen(false);
-            }}
-            title="Settings"
-          >
-            <Settings size={20} />
-          </button>
+          {appMode === 'editor' && (
+            <>
+              <button 
+                className={`icon-btn ${historyOpen ? 'active' : ''}`}
+                onClick={() => {
+                  setHistoryOpen(!historyOpen);
+                  if (settingsOpen) setSettingsOpen(false);
+                }}
+                title="History"
+              >
+                <History size={20} />
+              </button>
+              <button 
+                className={`icon-btn ${settingsOpen ? 'active' : ''}`}
+                onClick={() => {
+                  setSettingsOpen(!settingsOpen);
+                  if (historyOpen) setHistoryOpen(false);
+                }}
+                title="Settings"
+              >
+                <Settings size={20} />
+              </button>
+            </>
+          )}
+          {appMode !== 'landing' && (
+            <button 
+              className="icon-btn"
+              onClick={() => setAppMode('landing')}
+              title="Home"
+            >
+              <Home size={20} />
+            </button>
+          )}
         </div>
       </header>
 
