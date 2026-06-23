@@ -18,7 +18,7 @@ export const Teleprompter: React.FC = () => {
 
   const offsetRef = useRef(0);
   const textWrapperRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(0);
   const recognitionRef = useRef<any>(null);
   const finalTranscriptRef = useRef('');
   const [error, setError] = useState<string | null>(null);
@@ -93,18 +93,12 @@ export const Teleprompter: React.FC = () => {
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setError("Speech recognition is not supported in this browser.");
-      return;
-    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognitionRef.current = recognition;
-
-    let transcriptBuffer = "";
 
     recognition.onresult = (event: any) => {
       let interimTranscript = '';

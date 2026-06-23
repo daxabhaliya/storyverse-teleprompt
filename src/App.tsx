@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Settings, History } from 'lucide-react'
 import { AppProvider, useAppContext } from './context/AppContext'
 import { Editor } from './components/Editor'
@@ -10,7 +10,7 @@ import './App.css'
 function MainApp() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const { isPlaying, setIsPlaying } = useAppContext()
+  const { isPlaying } = useAppContext()
 
   return (
     <div className="app-container">
