@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, X, RotateCcw, Mic, Square } from 'lucide-react';
+import { Play, Pause, X, RotateCcw, Mic, Square, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 export const Teleprompter: React.FC = () => {
@@ -25,11 +25,13 @@ export const Teleprompter: React.FC = () => {
   const [isAutoScrollPaused, setIsAutoScrollPaused] = useState(false);
   const isPausedRef = useRef(false);
   const lastTouchY = useRef<number | null>(null);
+  const isRecordingIntentRef = useRef(false);
 
   // Recording state
   const [recordingState, setRecordingState] = useState<'inactive' | 'recording' | 'paused'>('inactive');
   const [pendingAudioUrl, setPendingAudioUrl] = useState<string | null>(null);
   const [audioTitle, setAudioTitle] = useState('');
+  const [audioExtension, setAudioExtension] = useState('webm');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -42,62 +44,114 @@ export const Teleprompter: React.FC = () => {
     };
   }, []);
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+  const startRecording = () => {
+    console.log("🎤 startRecording called. Setting state to 'recording'...");
+    setRecordingState('recording');
+    isRecordingIntentRef.current = true;
+    
+    // Give SpeechRecognition up to 600ms to completely release the hardware lock
+    setTimeout(() => {
+      console.log("🎤 Requesting microphone access (getUserMedia)...");
+      
+      const streamPromise = navigator.mediaDevices.getUserMedia({ audio: true });
+      const timeoutPromise = new Promise<MediaStream>((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout waiting for microphone access. Ensure permissions are granted and no other app is using the mic.")), 8000)
+      );
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
+      Promise.race([streamPromise, timeoutPromise])
+        .then(stream => {
+          console.log("🎤 Microphone access granted! Stream:", stream.id);
+          
+          if (!isRecordingIntentRef.current) {
+            console.log("🎤 User clicked Stop before microphone was acquired! Discarding stream.");
+            stream.getTracks().forEach(track => track.stop());
+            return;
+          }
 
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        setPendingAudioUrl(audioUrl);
-        
-        // Stop all tracks to release microphone
-        stream.getTracks().forEach(track => track.stop());
-      };
+          const mediaRecorder = new MediaRecorder(stream);
+          console.log("🎤 MediaRecorder created. MimeType:", mediaRecorder.mimeType);
+          mediaRecorderRef.current = mediaRecorder;
+          audioChunksRef.current = [];
 
-      mediaRecorder.start();
-      setRecordingState('recording');
-    } catch (err) {
-      console.error("Error accessing microphone:", err);
-      setError("Could not access microphone for recording. Please check permissions.");
-    }
+          mediaRecorder.ondataavailable = (e) => {
+            console.log("🎤 ondataavailable fired! Size:", e.data.size);
+            if (e.data.size > 0) {
+              audioChunksRef.current.push(e.data);
+            }
+          };
+
+          mediaRecorder.onstop = () => {
+            console.log("🎤 mediaRecorder.onstop fired! Total chunks:", audioChunksRef.current.length);
+            if (audioChunksRef.current.length === 0) {
+              console.error("🎤 No audio data recorded. Chunks array is empty.");
+              setError("No audio data was recorded. Your microphone might be muted or blocked by the emulator.");
+              stream.getTracks().forEach(track => track.stop());
+              return;
+            }
+
+            // Fallback to mp4/webm depending on what the browser generated
+            const mimeType = mediaRecorder.mimeType || 'audio/webm';
+            const extension = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+            console.log("🎤 Saving with extension:", extension, "MimeType:", mimeType);
+            setAudioExtension(extension);
+            
+            const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            console.log("🎤 Audio URL created successfully:", audioUrl);
+            setPendingAudioUrl(audioUrl);
+            
+            // Stop all tracks to release microphone
+            stream.getTracks().forEach(track => track.stop());
+          };
+
+          mediaRecorder.start(500);
+          console.log("🎤 mediaRecorder.start(500) called successfully.");
+        })
+        .catch(err => {
+          console.error("🎤 Error accessing microphone:", err);
+          setError(`Microphone error: ${err.message || 'Unknown error'}`);
+          setRecordingState('inactive');
+        });
+    }, 200);
   };
 
   const pauseRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.pause();
-      setRecordingState('paused');
     }
+    setRecordingState('paused');
   };
 
   const resumeRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
       mediaRecorderRef.current.resume();
-      setRecordingState('recording');
     }
+    setRecordingState('recording');
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      setRecordingState('inactive');
+    console.log("🎤 stopRecording called.");
+    isRecordingIntentRef.current = false;
+    
+    console.log("🎤 mediaRecorderRef exists:", !!mediaRecorderRef.current);
+    if (mediaRecorderRef.current) {
+      console.log("🎤 mediaRecorder state:", mediaRecorderRef.current.state);
     }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      console.log("🎤 Calling mediaRecorder.stop()...");
+      mediaRecorderRef.current.stop();
+    } else {
+      console.log("🎤 Skipping stop() because mediaRecorder is null or inactive.");
+    }
+    setRecordingState('inactive');
   };
 
   const saveRecording = () => {
     if (pendingAudioUrl) {
       const link = document.createElement('a');
       link.href = pendingAudioUrl;
-      link.download = `${audioTitle.trim() || 'storyverse-recording'}.webm`;
+      link.download = `${audioTitle.trim() || 'storyverse-recording'}.${audioExtension}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -139,11 +193,12 @@ export const Teleprompter: React.FC = () => {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [setIsPlaying]);
+  }, [voiceCommands, voiceTracking, isPlaying, recordingState]);
 
   // Auto-scroll logic
   useEffect(() => {
-    if (!isPlaying || voiceTracking || isAutoScrollPaused) {
+    const isVoiceTrackingActive = voiceTracking && recordingState === 'inactive';
+    if (!isPlaying || isVoiceTrackingActive || isAutoScrollPaused) {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       return;
     }
@@ -170,121 +225,113 @@ export const Teleprompter: React.FC = () => {
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [isPlaying, scrollSpeed, voiceTracking, isAutoScrollPaused, fontSize]);
+  }, [isPlaying, scrollSpeed, voiceTracking, isAutoScrollPaused, fontSize, recordingState]);
 
   // Voice tracking / commands logic
   useEffect(() => {
-    if (!isPlaying || (!voiceTracking && !voiceCommands)) {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-      return;
-    }
+    let isExplicitlyStopped = false;
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if ((voiceCommands || voiceTracking) && isPlaying && recordingState === 'inactive') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognitionRef.current = recognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognitionRef.current = recognition;
 
-    recognition.onresult = (event: any) => {
-      let interimTranscript = '';
-      let newFinalTranscript = '';
+      recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+        let newFinalTranscript = '';
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          newFinalTranscript += event.results[i][0].transcript;
-        } else {
-          interimTranscript += event.results[i][0].transcript;
-        }
-      }
-
-      if (newFinalTranscript) {
-        finalTranscriptRef.current += newFinalTranscript + ' ';
-      }
-
-      const combinedTranscript = (newFinalTranscript + interimTranscript).toLowerCase();
-      const totalSpoken = (finalTranscriptRef.current + interimTranscript).toLowerCase();
-
-      // Voice commands (we only need to check the recent combinedTranscript for commands)
-      if (voiceCommands) {
-        const wordsArr = combinedTranscript.split(/[\s,.-]+/);
-        const stopIdx = wordsArr.lastIndexOf("stop");
-        const startIdx = wordsArr.lastIndexOf("start");
-
-        if (stopIdx !== -1 || startIdx !== -1) {
-          if (stopIdx > startIdx) {
-            setIsAutoScrollPaused(true);
-            isPausedRef.current = true;
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            newFinalTranscript += event.results[i][0].transcript;
           } else {
-            setIsAutoScrollPaused(false);
-            isPausedRef.current = false;
+            interimTranscript += event.results[i][0].transcript;
           }
         }
-      }
 
-      // Voice tracking scrolling (perfectly syncs spoken word to center line)
-      if (voiceTracking && !isPausedRef.current) {
-        const totalWords = totalSpoken.trim().split(/\s+/).filter(Boolean).length;
-        const scriptWords = text.trim().split(/\s+/).filter(Boolean).length || 1;
-        
-        if (totalWords > 0 && textWrapperRef.current) {
-          const textElement = textWrapperRef.current.firstElementChild as HTMLElement;
-          if (textElement) {
-            const fraction = Math.min(1, totalWords / scriptWords);
-            const textHeight = textElement.offsetHeight;
-            offsetRef.current = fraction * textHeight; 
-            textWrapperRef.current.style.transform = `translateY(-${offsetRef.current}px)`;
+        if (newFinalTranscript) {
+          finalTranscriptRef.current += newFinalTranscript + ' ';
+        }
+
+        const combinedTranscript = (newFinalTranscript + interimTranscript).toLowerCase();
+        const totalSpoken = (finalTranscriptRef.current + interimTranscript).toLowerCase();
+
+        // Voice commands (we only need to check the recent combinedTranscript for commands)
+        if (voiceCommands) {
+          const wordsArr = combinedTranscript.split(/[\s,.-]+/);
+          const stopIdx = wordsArr.lastIndexOf("stop");
+          const startIdx = wordsArr.lastIndexOf("start");
+
+          if (stopIdx !== -1 || startIdx !== -1) {
+            if (stopIdx > startIdx) {
+              setIsAutoScrollPaused(true);
+              isPausedRef.current = true;
+            } else {
+              setIsAutoScrollPaused(false);
+              isPausedRef.current = false;
+            }
           }
         }
-      }
-    };
 
-    recognition.onstart = () => {
-      console.log("🎤 Speech recognition STARTED. Listening for commands...");
-    };
-
-    recognition.onerror = (event: any) => {
-      if (event.error === 'no-speech') {
-        // This is perfectly normal, the browser throws this if there's silence for a few seconds.
-        // It will automatically trigger onend and our code will restart it.
-        return;
-      }
-      console.error("🎤 Speech recognition ERROR:", event.error);
-      if (event.error === 'not-allowed') {
-        setError("Microphone access was denied. Please allow microphone permissions in your browser.");
-      }
-    };
-
-    recognition.onend = () => {
-      console.log("🎤 Speech recognition ENDED. Attempting to restart...");
-      // Restart if we are still playing and voice tracking/commands are enabled
-      if (isPlaying && (voiceTracking || voiceCommands)) {
-        try {
-          recognition.start();
-        } catch (e) {
-          console.error("🎤 Failed to restart recognition:", e);
+        // Voice tracking scrolling (perfectly syncs spoken word to center line)
+        const isVoiceTrackingActive = voiceTracking && recordingState === 'inactive';
+        if (isVoiceTrackingActive && !isPausedRef.current) {
+          const totalWords = totalSpoken.trim().split(/\s+/).filter(Boolean).length;
+          const scriptWords = text.trim().split(/\s+/).filter(Boolean).length || 1;
+          
+          if (totalWords > 0 && textWrapperRef.current) {
+            const textElement = textWrapperRef.current.firstElementChild as HTMLElement;
+            if (textElement) {
+              const fraction = Math.min(1, totalWords / scriptWords);
+              const textHeight = textElement.offsetHeight;
+              offsetRef.current = fraction * textHeight; 
+              textWrapperRef.current.style.transform = `translateY(-${offsetRef.current}px)`;
+            }
+          }
         }
-      }
-    };
+      };
 
-    try {
-      console.log("🎤 Attempting to start Speech Recognition...");
-      recognition.start();
-    } catch (e) {
-      console.error("🎤 Error starting Speech Recognition:", e);
+      recognition.onstart = () => {
+        // Silently start
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error === 'no-speech') return;
+        if (event.error === 'not-allowed') {
+          setError("Microphone access was denied. Please allow microphone permissions in your browser.");
+        }
+      };
+
+      recognition.onend = () => {
+        if (isPlaying && (voiceTracking || voiceCommands) && !isExplicitlyStopped) {
+          try {
+            recognition.start();
+          } catch (e) {
+            // Silently fail, it will be cleaned up
+          }
+        }
+      };
+
+      try {
+        recognition.start();
+      } catch (e) {
+        console.error("🎤 Error starting Speech Recognition:", e);
+      }
     }
 
     return () => {
-      console.log("🎤 Cleaning up Speech Recognition...");
-      // clear the onend handler so it doesn't restart when we intentionally stop it
-      recognition.onend = null;
-      try {
-        recognition.stop();
-      } catch (e) {}
+      isExplicitlyStopped = true;
+      if (recognitionRef.current) {
+        recognitionRef.current.onend = null;
+        try {
+          // Use abort() instead of stop() to instantly kill the engine and release the hardware lock!
+          recognitionRef.current.abort();
+        } catch (e) {}
+      }
     };
-  }, [isPlaying, voiceTracking, voiceCommands, fontSize]);
+  }, [isPlaying, voiceTracking, voiceCommands, fontSize, recordingState]);
 
   const renderText = () => {
     if (!coloredText) return text;
@@ -357,7 +404,8 @@ export const Teleprompter: React.FC = () => {
           background: 'rgba(0, 0, 0, 0.6)',
           borderRadius: '50%',
           padding: '2rem',
-          backdropFilter: 'blur(4px)'
+          backdropFilter: 'blur(4px)',
+          pointerEvents: 'none'
         }}>
           <Pause size={100} color="white" />
         </div>
@@ -388,71 +436,95 @@ export const Teleprompter: React.FC = () => {
         </div>
       </div>
 
-      <div className="teleprompter-overlay-controls glass">
-        {recordingState === 'inactive' ? (
+      <div className="teleprompter-overlay-controls glass" style={{ padding: '0.25rem', gap: '0.5rem', width: 'auto', flexWrap: 'nowrap' }}>
+        
+        {/* Voice Controls Group */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: recordingState !== 'inactive' ? 'rgba(239, 68, 68, 0.1)' : 'transparent', padding: '0.25rem 0.5rem', borderRadius: '40px', border: recordingState !== 'inactive' ? '1px solid rgba(239, 68, 68, 0.3)' : 'none' }}>
+          {recordingState !== 'inactive' && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.25rem', color: '#ef4444' }}>
+              <Mic size={14} />
+            </div>
+          )}
+          {recordingState === 'inactive' ? (
+            <button 
+              className="icon-btn"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); startRecording(); }}
+              title="Start Voice Recording"
+              style={{ width: '36px', height: '36px' }}
+            >
+              <Mic size={14} />
+            </button>
+          ) : (
+            <>
+              <button 
+                className="icon-btn"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); recordingState === 'recording' ? pauseRecording() : resumeRecording(); }}
+                title={recordingState === 'recording' ? "Pause Recording" : "Resume Recording"}
+                style={{ color: '#eab308', borderColor: '#eab308', width: '36px', height: '36px' }}
+              >
+                {recordingState === 'recording' ? <Pause size={14} /> : <Play size={14} />}
+              </button>
+              <button 
+                className="icon-btn"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); stopRecording(); }}
+                title="Stop & Save Recording"
+                style={{ color: '#ef4444', borderColor: '#ef4444', animation: recordingState === 'recording' ? 'pulse 2s infinite' : 'none', width: '36px', height: '36px' }}
+              >
+                <Square size={14} fill="currentColor" />
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Scroll Controls Group */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.5rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '40px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.25rem', color: 'var(--text-secondary)' }}>
+            <FileText size={14} />
+          </div>
           <button 
-            className="icon-btn"
-            onClick={startRecording}
-            title="Start Voice Recording"
+            className="icon-btn" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const newVal = !isAutoScrollPaused;
+              setIsAutoScrollPaused(newVal);
+              isPausedRef.current = newVal;
+            }}
+            title={isAutoScrollPaused ? "Play Scroll" : "Pause Scroll"}
+            style={{ width: '36px', height: '36px' }}
           >
-            <Mic size={20} />
+            {isAutoScrollPaused ? <Play size={14} /> : <Pause size={14} />}
           </button>
-        ) : (
-          <>
-            <button 
-              className="icon-btn"
-              onClick={recordingState === 'recording' ? pauseRecording : resumeRecording}
-              title={recordingState === 'recording' ? "Pause Recording" : "Resume Recording"}
-              style={{ color: '#eab308', borderColor: '#eab308' }}
-            >
-              {recordingState === 'recording' ? <Pause size={20} /> : <Play size={20} />}
-            </button>
-            <button 
-              className="icon-btn"
-              onClick={stopRecording}
-              title="Stop & Save Recording"
-              style={{ color: '#ef4444', borderColor: '#ef4444', animation: recordingState === 'recording' ? 'pulse 2s infinite' : 'none' }}
-            >
-              <Square size={20} fill="currentColor" />
-            </button>
-          </>
-        )}
-        <button 
-          className="icon-btn" 
-          onClick={() => {
-            const newVal = !isAutoScrollPaused;
-            setIsAutoScrollPaused(newVal);
-            isPausedRef.current = newVal;
-          }}
-          title={isAutoScrollPaused ? "Play" : "Pause"}
-        >
-          {isAutoScrollPaused ? <Play size={20} /> : <Pause size={20} />}
-        </button>
-        <button 
-          className="icon-btn" 
-          onClick={() => {
-            offsetRef.current = 0;
-            finalTranscriptRef.current = '';
-            if (textWrapperRef.current) {
-              textWrapperRef.current.style.transform = `translateY(0px)`;
-            }
-          }}
-          title="Replay from start"
-        >
-          <RotateCcw size={20} />
-        </button>
-        <button 
-          className="icon-btn" 
-          onClick={() => {
-            setIsPlaying(false);
-            if (window.history.state?.isTeleprompter) {
-              window.history.back();
-            }
-          }}
-          title="Stop and Exit"
-        >
-          <X size={20} />
-        </button>
+          <button 
+            className="icon-btn" 
+            onClick={(e) => {
+              e.preventDefault(); e.stopPropagation();
+              offsetRef.current = 0;
+              finalTranscriptRef.current = '';
+              if (textWrapperRef.current) {
+                textWrapperRef.current.style.transform = `translateY(0px)`;
+              }
+            }}
+            title="Replay from start"
+            style={{ width: '36px', height: '36px' }}
+          >
+            <RotateCcw size={14} />
+          </button>
+          <button 
+            className="icon-btn" 
+            onClick={(e) => {
+              e.preventDefault(); e.stopPropagation();
+              setIsPlaying(false);
+              if (window.history.state?.isTeleprompter) {
+                window.history.back();
+              }
+            }}
+            title="Stop and Exit"
+            style={{ width: '36px', height: '36px' }}
+          >
+            <X size={14} />
+          </button>
+        </div>
       </div>
 
       {pendingAudioUrl && (
