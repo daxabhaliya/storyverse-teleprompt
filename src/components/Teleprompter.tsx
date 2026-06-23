@@ -104,8 +104,8 @@ export const Teleprompter: React.FC = () => {
             stream.getTracks().forEach(track => track.stop());
           };
 
-          mediaRecorder.start(500);
-          console.log("🎤 mediaRecorder.start(500) called successfully.");
+          mediaRecorder.start();
+          console.log("🎤 mediaRecorder.start() called successfully.");
         })
         .catch(err => {
           console.error("🎤 Error accessing microphone:", err);
