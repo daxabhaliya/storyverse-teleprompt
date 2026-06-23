@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, X, RotateCcw } from 'lucide-react';
+import { Play, Pause, X, RotateCcw, Mic, Square } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 export const Teleprompter: React.FC = () => {
@@ -25,6 +25,62 @@ export const Teleprompter: React.FC = () => {
   const [isAutoScrollPaused, setIsAutoScrollPaused] = useState(false);
   const isPausedRef = useRef(false);
   const lastTouchY = useRef<number | null>(null);
+
+  // Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
+
+  const handleToggleRecording = async () => {
+    if (isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const link = document.createElement('a');
+          link.href = audioUrl;
+          link.download = `storyverse-recording-${Date.now()}.webm`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          // Stop all tracks to release microphone
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Error accessing microphone:", err);
+        setError("Could not access microphone for recording. Please check permissions.");
+      }
+    }
+  };
 
   // Auto-hide error
   useEffect(() => {
@@ -309,6 +365,14 @@ export const Teleprompter: React.FC = () => {
       </div>
 
       <div className="teleprompter-overlay-controls glass">
+        <button 
+          className="icon-btn"
+          onClick={handleToggleRecording}
+          title={isRecording ? "Stop & Save Recording" : "Start Voice Recording"}
+          style={isRecording ? { color: '#ef4444', borderColor: '#ef4444', animation: 'pulse 2s infinite' } : {}}
+        >
+          {isRecording ? <Square size={20} fill="currentColor" /> : <Mic size={20} />}
+        </button>
         <button 
           className="icon-btn" 
           onClick={() => {
