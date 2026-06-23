@@ -112,7 +112,7 @@ export const Teleprompter: React.FC = () => {
           setError(`Microphone error: ${err.message || 'Unknown error'}`);
           setRecordingState('inactive');
         });
-    }, 200);
+    }, 1000); // Wait 1 full second for Android OS to release the hardware lock!
   };
 
   const pauseRecording = () => {
