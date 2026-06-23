@@ -1,21 +1,29 @@
 import { useState } from 'react'
-import { Settings, History } from 'lucide-react'
+import { Settings, History, Home } from 'lucide-react'
 import { AppProvider, useAppContext } from './context/AppContext'
 import { Editor } from './components/Editor'
 import { Teleprompter } from './components/Teleprompter'
 import { SettingsPanel } from './components/SettingsPanel'
 import { HistoryPanel } from './components/HistoryPanel'
+import { LandingPage } from './components/LandingPage'
+import { RecorderScreen } from './components/RecorderScreen'
 import './App.css'
 
 function MainApp() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const { isPlaying } = useAppContext()
+  const { isPlaying, appMode, setAppMode } = useAppContext()
 
   return (
     <div className="app-container">
       <header className="header glass">
-        <h1>StoryVerse Teleprompter</h1>
+        <h1 
+          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }} 
+          onClick={() => setAppMode('landing')}
+        >
+          {appMode !== 'landing' && <Home size={20} />}
+          StoryVerse Teleprompter
+        </h1>
         <div className="header-actions">
           <button 
             className={`icon-btn ${historyOpen ? 'active' : ''}`}
@@ -41,10 +49,18 @@ function MainApp() {
       </header>
 
       <main className="main-content">
-        <Editor />
-        <HistoryPanel isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
-        <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
-        {isPlaying && <Teleprompter />}
+        {appMode === 'landing' && <LandingPage />}
+        
+        {appMode === 'editor' && (
+          <>
+            <Editor />
+            <HistoryPanel isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
+            <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+            {isPlaying && <Teleprompter />}
+          </>
+        )}
+
+        {appMode === 'recorder' && <RecorderScreen />}
       </main>
     </div>
   )

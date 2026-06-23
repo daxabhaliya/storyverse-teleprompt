@@ -24,6 +24,8 @@ interface AppContextType {
   history: string[];
   saveToHistory: (text: string) => void;
   removeFromHistory: (index: number) => void;
+  appMode: 'landing' | 'editor' | 'recorder';
+  setAppMode: (mode: 'landing' | 'editor' | 'recorder') => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -56,6 +58,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [voiceCommands, setVoiceCommands] = useState(initialSettings.voiceCommands);
   const [coloredText, setColoredText] = useState(initialSettings.coloredText);
   const [history, setHistory] = useState<string[]>([]);
+  const [appMode, setAppMode] = useState<'landing' | 'editor' | 'recorder'>('landing');
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('teleprompterHistory');
@@ -124,7 +127,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         voiceCommands, setVoiceCommands,
         coloredText, setColoredText,
         saveSettings, resetSettings,
-        history, saveToHistory, removeFromHistory
+        history, saveToHistory, removeFromHistory,
+        appMode, setAppMode
       }}
     >
       {children}

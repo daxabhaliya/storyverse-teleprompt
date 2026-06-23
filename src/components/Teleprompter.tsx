@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, X, RotateCcw, Mic, Square, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useAudioRecorder } from '../hooks/useAudioRecorder';
 
 export const Teleprompter: React.FC = () => {
   const { 
@@ -25,140 +26,21 @@ export const Teleprompter: React.FC = () => {
   const [isAutoScrollPaused, setIsAutoScrollPaused] = useState(false);
   const isPausedRef = useRef(false);
   const lastTouchY = useRef<number | null>(null);
-  const isRecordingIntentRef = useRef(false);
 
-  // Recording state
-  const [recordingState, setRecordingState] = useState<'inactive' | 'recording' | 'paused'>('inactive');
-  const [pendingAudioUrl, setPendingAudioUrl] = useState<string | null>(null);
-  const [audioTitle, setAudioTitle] = useState('');
-  const [audioExtension, setAudioExtension] = useState('webm');
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-
-  // Cleanup recording on unmount
-  useEffect(() => {
-    return () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-      }
-    };
-  }, []);
-
-  const startRecording = () => {
-    console.log("🎤 startRecording called. Setting state to 'recording'...");
-    setRecordingState('recording');
-    isRecordingIntentRef.current = true;
-    
-    // Give SpeechRecognition up to 600ms to completely release the hardware lock
-    setTimeout(() => {
-      console.log("🎤 Requesting microphone access (getUserMedia)...");
-      
-      const streamPromise = navigator.mediaDevices.getUserMedia({ audio: true });
-      const timeoutPromise = new Promise<MediaStream>((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout waiting for microphone access. Ensure permissions are granted and no other app is using the mic.")), 8000)
-      );
-
-      Promise.race([streamPromise, timeoutPromise])
-        .then(stream => {
-          console.log("🎤 Microphone access granted! Stream:", stream.id);
-          
-          if (!isRecordingIntentRef.current) {
-            console.log("🎤 User clicked Stop before microphone was acquired! Discarding stream.");
-            stream.getTracks().forEach(track => track.stop());
-            return;
-          }
-
-          const mediaRecorder = new MediaRecorder(stream);
-          console.log("🎤 MediaRecorder created. MimeType:", mediaRecorder.mimeType);
-          mediaRecorderRef.current = mediaRecorder;
-          audioChunksRef.current = [];
-
-          mediaRecorder.ondataavailable = (e) => {
-            console.log("🎤 ondataavailable fired! Size:", e.data.size);
-            if (e.data.size > 0) {
-              audioChunksRef.current.push(e.data);
-            }
-          };
-
-          mediaRecorder.onstop = () => {
-            console.log("🎤 mediaRecorder.onstop fired! Total chunks:", audioChunksRef.current.length);
-            if (audioChunksRef.current.length === 0) {
-              console.error("🎤 No audio data recorded. Chunks array is empty.");
-              setError("No audio data was recorded. Your microphone might be muted or blocked by the emulator.");
-              stream.getTracks().forEach(track => track.stop());
-              return;
-            }
-
-            // Fallback to mp4/webm depending on what the browser generated
-            const mimeType = mediaRecorder.mimeType || 'audio/webm';
-            const extension = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
-            console.log("🎤 Saving with extension:", extension, "MimeType:", mimeType);
-            setAudioExtension(extension);
-            
-            const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            console.log("🎤 Audio URL created successfully:", audioUrl);
-            setPendingAudioUrl(audioUrl);
-            
-            // Stop all tracks to release microphone
-            stream.getTracks().forEach(track => track.stop());
-          };
-
-          mediaRecorder.start();
-          console.log("🎤 mediaRecorder.start() called successfully.");
-        })
-        .catch(err => {
-          console.error("🎤 Error accessing microphone:", err);
-          setError(`Microphone error: ${err.message || 'Unknown error'}`);
-          setRecordingState('inactive');
-        });
-    }, 1000); // Wait 1 full second for Android OS to release the hardware lock!
-  };
-
-  const pauseRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.pause();
-    }
-    setRecordingState('paused');
-  };
-
-  const resumeRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
-      mediaRecorderRef.current.resume();
-    }
-    setRecordingState('recording');
-  };
-
-  const stopRecording = () => {
-    console.log("🎤 stopRecording called.");
-    isRecordingIntentRef.current = false;
-    
-    console.log("🎤 mediaRecorderRef exists:", !!mediaRecorderRef.current);
-    if (mediaRecorderRef.current) {
-      console.log("🎤 mediaRecorder state:", mediaRecorderRef.current.state);
-    }
-
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      console.log("🎤 Calling mediaRecorder.stop()...");
-      mediaRecorderRef.current.stop();
-    } else {
-      console.log("🎤 Skipping stop() because mediaRecorder is null or inactive.");
-    }
-    setRecordingState('inactive');
-  };
-
-  const saveRecording = () => {
-    if (pendingAudioUrl) {
-      const link = document.createElement('a');
-      link.href = pendingAudioUrl;
-      link.download = `${audioTitle.trim() || 'storyverse-recording'}.${audioExtension}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setPendingAudioUrl(null);
-      setAudioTitle('');
-    }
-  };
+  const {
+    recordingState,
+    recordingTime,
+    pendingAudioUrl,
+    audioTitle,
+    setAudioTitle,
+    setPendingAudioUrl,
+    startRecording,
+    pauseRecording,
+    resumeRecording,
+    stopRecording,
+    saveRecording,
+    formatTime
+  } = useAudioRecorder(setError);
 
   // Auto-hide error
   useEffect(() => {
@@ -441,8 +323,9 @@ export const Teleprompter: React.FC = () => {
         {/* Voice Controls Group */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: recordingState !== 'inactive' ? 'rgba(239, 68, 68, 0.1)' : 'transparent', padding: '0.25rem 0.5rem', borderRadius: '40px', border: recordingState !== 'inactive' ? '1px solid rgba(239, 68, 68, 0.3)' : 'none' }}>
           {recordingState !== 'inactive' && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.25rem', color: '#ef4444' }}>
-              <Mic size={14} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.25rem', color: '#ef4444', gap: '0.25rem', fontFamily: 'monospace', fontWeight: 'bold' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', animation: recordingState === 'recording' ? 'pulse 2s infinite' : 'none' }} />
+              <span style={{ fontSize: '0.9rem', marginRight: '0.25rem' }}>{formatTime(recordingTime)}</span>
             </div>
           )}
           {recordingState === 'inactive' ? (
