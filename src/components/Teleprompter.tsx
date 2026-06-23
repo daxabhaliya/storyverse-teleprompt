@@ -26,6 +26,14 @@ export const Teleprompter: React.FC = () => {
   const isPausedRef = useRef(false);
   const lastTouchY = useRef<number | null>(null);
 
+  // Auto-hide error
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -250,8 +258,11 @@ export const Teleprompter: React.FC = () => {
   return (
     <div className="teleprompter-view">
       {error && (
-        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', background: 'var(--danger)', color: 'white', padding: '1rem', borderRadius: '8px', zIndex: 100 }}>
-          {error}
+        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', background: 'var(--danger)', color: 'white', padding: '1rem', borderRadius: '8px', zIndex: 100, display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span>{error}</span>
+          <button onClick={() => setError(null)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '4px' }}>
+            <X size={16} />
+          </button>
         </div>
       )}
       <div className="reading-line"></div>
